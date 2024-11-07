@@ -1,0 +1,871 @@
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(compareGroups)
+
+
+
+
+
+
+load("ATP_final.RData")
+
+
+
+# 1. Mean
+
+
+round(sapply((datos_combinados %>% select(where(is.numeric))), mean, na.rm = TRUE),4)
+
+
+
+
+
+
+# 2. Percentages: LL and PR
+
+
+table(datos_combinados$LL)
+table(datos_combinados$PR)
+
+
+table(datos_combinados$LL)["Yes"]*100/
+  (table(datos_combinados$LL)["No"]+table(datos_combinados$LL)["Yes"])
+
+
+table(datos_combinados$PR)["Yes"]*100/
+  (table(datos_combinados$PR)["No"]+table(datos_combinados$PR)["Yes"])
+  
+
+
+## Prevalence PR by year
+
+
+
+PR_summary <- datos_combinados %>%
+  group_by(year) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary <- PR_summary %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+
+
+PRI <- ggplot(PR_summary, aes(x = year, y = PR_ratio)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of protected ranking by Year with 95% Confidence Interval", 
+       x = "Year", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.03)) 
+
+PRI
+
+
+
+
+
+
+
+## Prevalence of LL by year
+
+
+
+LL_summary <- datos_combinados %>%
+  group_by(year) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary <- LL_summary %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+
+
+LLI <- ggplot(LL_summary, aes(x = year, y = LL_ratio)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by Year with 95% Confidence Interval", 
+       x = "Year", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.1)) 
+
+LLI
+
+
+
+
+## Prevalence PR by level
+
+
+
+PR_summary_l <- datos_combinados %>%
+  group_by(tourney_level) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_l <- PR_summary_l %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRlevel <- ggplot(PR_summary_l, aes(x = tourney_level, y = PR_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by level with 95% Confidence Interval", 
+       x = "Year", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.01)) 
+
+PRlevel
+
+
+
+
+## Prevalence LL by level
+
+
+LL_summary_l <- datos_combinados %>%
+  group_by(tourney_level) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_l <- LL_summary_l %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLlevel <- ggplot(LL_summary_l, aes(x = tourney_level, y = LL_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by level with 95% Confidence Interval", 
+       x = "Year", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+LLlevel
+
+
+
+## Prevalence PR by age
+
+
+
+PR_summary_a <- datos_combinados %>%
+  group_by(dif_age) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_a <- PR_summary_a %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRage <- ggplot(PR_summary_a, aes(x = dif_age, y = PR_ratio)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Age difference", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.02)) 
+
+PRage
+
+
+
+
+## Prevalence LL by age
+
+
+
+LL_summary_a <- datos_combinados %>%
+  group_by(dif_age) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_a <- LL_summary_a %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLage <- ggplot(LL_summary_a, aes(x = dif_age, y = LL_ratio)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Age difference", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+LLage
+
+
+
+## PR by hand
+
+### Winner
+
+
+PR_summary_hw <- datos_combinados %>%
+  group_by(winner_hand) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_hw <- PR_summary_hw %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRwh <- ggplot(PR_summary_hw, aes(x = winner_hand, y = PR_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Winner Hand", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+PRwh
+
+
+### Loser
+
+
+
+
+PR_summary_hl <- datos_combinados %>%
+  group_by(loser_hand) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_hl <- PR_summary_hl %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRlh <- ggplot(PR_summary_hl, aes(x = loser_hand, y = PR_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Loser Hand", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+PRlh
+
+
+
+## LL by hand
+### Winner
+
+
+LL_summary_hw <- datos_combinados %>%
+  group_by(winner_hand) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_hw <- LL_summary_hw %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLwh <- ggplot(LL_summary_hw, aes(x = winner_hand, y = LL_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Winner Hand", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+LLwh
+
+
+### Loser
+
+
+
+
+LL_summary_hl <- datos_combinados %>%
+  group_by(loser_hand) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_hl <- LL_summary_hl %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLlh <- ggplot(LL_summary_hl, aes(x = loser_hand, y = LL_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Loser Hand", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+LLlh
+
+
+
+## PR by surface
+
+
+
+PR_summary_sur <- datos_combinados %>%
+  group_by(surface) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_sur <- PR_summary_sur %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRsur <- ggplot(PR_summary_sur, aes(x = surface, y = PR_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Winner Hand", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+PRsur
+
+
+
+## LL by surface
+
+
+
+
+LL_summary_sur <- datos_combinados %>%
+  group_by(surface) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_sur <- LL_summary_sur %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLsur <- ggplot(LL_summary_sur, aes(x = surface, y = LL_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "LLevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Winner Hand", 
+       y = "LLevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+LLsur
+
+
+
+## PR by country
+
+### Winner
+
+
+PR_summary_cw <- datos_combinados %>%
+  group_by(winner_ioc) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_cw <- PR_summary_cw %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRcw <- ggplot(PR_summary_cw, aes(x = winner_ioc, y = PR_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Winner ioc", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+PRcw
+
+
+### Loser
+
+
+
+
+PR_summary_cl <- datos_combinados %>%
+  group_by(loser_ioc) %>%
+  summarise(
+    PR_yes = sum(PR == "Yes"),
+    PR_total = n(),
+    PR_ratio = PR_yes / PR_total
+  )
+
+# 95 % CI
+
+PR_summary_cl <- PR_summary_cl %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(PR_yes, PR_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+PRlc <- ggplot(PR_summary_cl, aes(x = loser_ioc, y = PR_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Loser ioc", 
+       y = "Prevalence (PR = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 0.05)) 
+
+PRlc
+
+
+
+
+## LL by country
+
+### Winner
+
+
+LL_summary_cw <- datos_combinados %>%
+  group_by(winner_ioc) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_cw <- LL_summary_cw %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLcw <- ggplot(LL_summary_cw, aes(x = winner_ioc, y = LL_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Winner ioc", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 1)) 
+
+LLcw
+
+
+### Loser
+
+
+
+
+LL_summary_cl <- datos_combinados %>%
+  group_by(loser_ioc) %>%
+  summarise(
+    LL_yes = sum(LL == "Yes"),
+    LL_total = n(),
+    LL_ratio = LL_yes / LL_total
+  )
+
+# 95 % CI
+
+LL_summary_cl <- LL_summary_cl %>%
+  rowwise() %>%
+  mutate(
+    conf_int = list(binom.test(LL_yes, LL_total)$conf.int),
+    lower_ci = conf_int[[1]],
+    upper_ci = conf_int[[2]]
+  ) %>%
+  ungroup()
+
+
+
+
+
+
+LLlc <- ggplot(LL_summary_cl, aes(x = loser_ioc, y = LL_ratio)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
+  labs(title = "Prevalence of Lucky loser by age with 95% Confidence Interval", 
+       x = "Loser ioc", 
+       y = "Prevalence (LL = Yes)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+   scale_y_continuous(limits = c(0, 1)) 
+
+LLlc
+
+
+
+# 3. Percentaje per tourney
+
+Check if there is any match with two LL or PR, or LL and PR
+
+
+
+# 2 LL
+cond1 <- datos_combinados$LLW == 1 & datos_combinados$LLL == 1
+
+# 2 PR
+cond2 <- datos_combinados$PRW == 1 & datos_combinados$PRL == 1
+
+# 1 PR and 1 LL
+cond3 <- (datos_combinados$PRW == 1 | datos_combinados$LLL == 1) &
+         (datos_combinados$LLW == 1 | datos_combinados$PRL == 1)
+
+partidos_double_LL_and_or_PR <- datos_combinados %>%
+  filter(cond1 | cond2 | cond3)
+
+head(partidos_double_LL_and_or_PR)
+summary(partidos_double_LL_and_or_PR)
+
+
+
+
+There are 45 matches with a LL/PR or two of them. 
+
+### For LL 
+
+
+
+
+
+# Create a new dataframe that counts unique LL per tournament
+unique_ll_per_tournament <- datos_combinados %>%
+  # Create a temporary dataframe to identify LL players in each match
+  select(tourney_id, winner_id, loser_id, LLW, LLL) %>%
+  pivot_longer(cols = c(winner_id, loser_id), names_to = "player_type", values_to = "player_id") %>%
+  # Keep only matches where players are LL
+  filter((player_type == "winner_id" & LLW == 1) | (player_type == "loser_id" & LLL == 1)) %>%
+  # Group by tournament and count unique LL players
+  group_by(tourney_id) %>%
+  summarise(unique_LL_count = n_distinct(player_id)) %>%
+  ungroup()
+
+
+
+sum(unique_ll_per_tournament$unique_LL_count)
+n_distinct(unique_ll_per_tournament$tourney_id)
+n_distinct(datos_combinados$tourney_id)
+
+
+Tournaments_with_LL <- n_distinct(unique_ll_per_tournament$tourney_id)*100/n_distinct(datos_combinados$tourney_id)
+Tournaments_with_LL
+
+binom.test(sum(unique_ll_per_tournament$unique_LL_count), n_distinct(datos_combinados$tourney_id), conf.level = 0.95)
+
+
+
+
+
+
+### For PR
+
+
+
+# Create a new dataframe that counts unique PR per tournament
+unique_pr_per_tournament <- datos_combinados %>%
+  # Create a temporary dataframe to identify PR players in each match
+  select(tourney_id, winner_id, loser_id, PRW, PRL) %>%
+  pivot_longer(cols = c(winner_id, loser_id), names_to = "player_type", values_to = "player_id") %>%
+  # Keep only matches where players are PR
+  filter((player_type == "winner_id" & PRW == 1) | (player_type == "loser_id" & PRL == 1)) %>%
+  # Group by tournament and count unique PR players
+  group_by(tourney_id) %>%
+  summarise(unique_PR_count = n_distinct(player_id)) %>%
+  ungroup()
+
+
+
+sum(unique_pr_per_tournament$unique_PR_count)
+n_distinct(unique_pr_per_tournament$tourney_id)
+n_distinct(datos_combinados$tourney_id)
+
+
+Tournaments_with_PR <- n_distinct(unique_pr_per_tournament$tourney_id)*100/n_distinct(datos_combinados$tourney_id)
+Tournaments_with_PR
+
+binom.test(sum(unique_pr_per_tournament$unique_PR_count), n_distinct(datos_combinados$tourney_id), conf.level = 0.95)
+
+
+
+
+
+# 4. Winer/loser new variable
+
+
+#LL
+datos_combinados <- datos_combinados %>%
+  mutate(
+    LL_wins = case_when(
+      winner_entry == "LL" ~ 1,
+      loser_entry == "LL" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    LL_loses = case_when(
+      loser_entry == "LL" ~ 1,
+      winner_entry == "LL" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+
+#PR
+datos_combinados <- datos_combinados %>%
+  mutate(
+    PR_wins = case_when(
+      winner_entry == "PR" ~ 1,
+      loser_entry == "PR" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    PR_loses = case_when(
+      loser_entry == "PR" ~ 1,
+      winner_entry == "PR" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+
+
+
+
+## Comparing groups
+
+
+compareGroups(LL_wins ~ ., data = datos_combinados)
+compareGroups(LL_loses ~ ., data = datos_combinados)
+
+
+compareGroups(PR_wins ~ ., data = datos_combinados)
+compareGroups(PR_loses ~ ., data = datos_combinados)
+
+
+
+
