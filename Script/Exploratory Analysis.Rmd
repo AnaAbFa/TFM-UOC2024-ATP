@@ -1,0 +1,223 @@
+---
+title: "Exploratory analysis"
+author: "Ana Abad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(gtsummary)
+library(DataExplorer)
+library(ggplot2)
+```
+
+
+
+```{r}
+load("ATP_final.RData")
+```
+
+## 1. Summary
+```{r}
+summary(datos_combinados)
+```
+
+## 2. Variable characteristics
+
+### games
+
+
+```{r}
+table(datos_combinados$games, useNA = "always")
+```
+
+
+
+
+### tourney_name
+
+```{r}
+n_distinct(datos_combinados$tourney_name)
+n_distinct(datos_combinados$tourney_id)
+```
+
+### Surface
+```{r}
+unique(datos_combinados$surface)
+table(datos_combinados$surface)
+```
+### tourney_level and level
+
+```{r}
+
+unique(datos_combinados$tourney_level)
+table(datos_combinados$tourney_level)
+
+```
+
+### round
+
+```{r}
+table(datos_combinados$round)
+```
+
+### winner_id, loser_id
+
+```{r}
+
+n_distinct(datos_combinados$winner_id)
+n_distinct(datos_combinados$loser_id)
+```
+### winner/loser_entry
+
+```{r}
+unique(datos_combinados$winner_entry)
+unique(datos_combinados$loser_entry)
+
+```
+
+### hands 
+
+```{r}
+
+unique(datos_combinados$winner_hand)
+unique(datos_combinados$loser_hand)
+
+```
+
+### country
+
+```{r}
+
+n_distinct(datos_combinados$winner_ioc)
+n_distinct(datos_combinados$loser_ioc)
+
+```
+### Age
+```{r}
+summary(datos_combinados$winner_age)
+summary(datos_combinados$loser_age)
+is.integer(datos_combinados$winner_rank)
+summary(datos_combinados$dif_age)
+```
+
+
+### Ranking
+
+
+```{r}
+missing_data_summary <- datos_combinados %>%
+  filter(is.na(winner_rank)) %>%
+  group_by(year) %>%
+  summarize(missing_count = n())
+
+# Plotting missing data per year
+ggplot(missing_data_summary, aes(x = year, y = missing_count)) +
+  geom_bar(stat = "identity", fill = "#000078") +
+  labs(title = "Missing Winner Rank Data by Year",
+       x = "Year",
+       y = "Count of Missing Winner Rank") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+### Summary 
+
+
+```{r}
+tbl_summary(data = datos_combinados, include = c(surface, tourney_level, winner_hand, loser_hand, dif_age, winner_rank, loser_rank, dif_rank))
+```
+
+
+
+
+## 3. Report by PR and LL
+
+```{r}
+
+
+tbl_summary(data = datos_combinados, by = PR, include = c(year, surface, tourney_level, winner_hand, loser_hand, dif_age, winner_rank, loser_rank, dif_rank))
+
+
+tbl_summary(data = datos_combinados, by = LL, include = c(year, surface, tourney_level, winner_hand, loser_hand, dif_age, winner_rank, loser_rank, dif_rank))
+
+
+
+
+```
+
+
+## 4. Distributions
+
+
+
+```{r}
+
+plot_histogram(datos_combinados)
+plot_bar(datos_combinados)
+
+
+```
+
+Normality in continuous variables
+
+```{r}
+
+library(ggpubr)
+
+ggqqplot(datos_combinados$dif_age, title ="dif_age")
+ggqqplot(datos_combinados$dif_rank, title = "dif_rank")
+ggqqplot(datos_combinados$winner_age, title = "winner_age")
+ggqqplot(datos_combinados$loser_age, title = "loser_age")
+ggqqplot(datos_combinados$winner_rank, title = "winner_rank")
+ggqqplot(datos_combinados$loser_rank, title = "loser_rank")
+ggqqplot(datos_combinados$best_of, title = "best_of")
+ggqqplot(datos_combinados$games, title = "games")
+
+
+
+```
+
+
+
+
+## 5. Missing data
+
+
+```{r}
+missing_per_column <- colSums(is.na(datos_combinados))
+
+missing_percentage <- missing_per_column * 100 / nrow(datos_combinados) 
+missing_percentage
+
+
+missing_data <- data.frame(
+  variable = names(datos_combinados),
+  missing_count = colSums(is.na(datos_combinados)),
+  total = nrow(datos_combinados)
+)
+
+missing_data$percentage <- missing_percentage
+
+Missingdata <- ggplot(missing_data, aes(x = reorder(variable, -percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "#73edff") +
+  labs(title = "Missing data in each variable", 
+       x = "Variable", 
+       y = "Missing data (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+
+Missingdata
+
+ggsave(filename = "Missingdata.tif", plot = Missingdata, device = "tiff",  dpi = 300)
+
+```
+
+
