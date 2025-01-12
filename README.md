@@ -30,10 +30,10 @@ Similarly, for the player characteristics:
 | `loser_age`        | Age of the losing player.                                                                        | Continuous variable.                                                           |
 | `loser_rank`       | World ranking of the losing player at the time of the match.                                     | Integer variable.                                                              |
 | `dif_age`          | Difference in age between the winner and loser.                                                  | Continuous variable (can be negative); missing values (`NA`) present.          |
-| `dif_rank`         | Difference in ranking between the winner and loser.      
-loser_ioc| Country of the losing player. | Includes 113 distinct values.
-loser_age| Age of the losing player.| A continuous variable.
-loser_rank| World ranking of the losing player at the time of the match.| An integer variable.
-dif_age| Difference in age between the winner and loser.| A continuous variable, can take negative values. Missing values (NA) are present in the data.
-dif_rank| Difference in ranking between the winner and loser.| A continuous variable, can take negative values. Missing values (NA) are present in the data.
+| `dif_rank`         | Difference in ranking between the winner and loser.                                              | Continuous variable (can be negative); missing values (`NA`) present.          |
+|`loser_ioc`         | Country of the losing player.                                                                    | Includes 113 distinct values.                                                  |
+|`loser_age`         | Age of the losing player.                                                                        | A continuous variable.                                                         |
+|`loser_rank`        | World ranking of the losing player at the time of the match.                                     | An integer variable.                                                           |
+|`dif_age`           | Difference in age between the winner and loser.                                                  | A continuous variable, can take negative values. Missing values (NA) are present in the data.|
+|`dif_rank`          | Difference in ranking between the winner and loser.                                              | A continuous variable, can take negative values. Missing values (NA) are present in the data.|
 
