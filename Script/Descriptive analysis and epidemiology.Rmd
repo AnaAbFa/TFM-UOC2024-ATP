@@ -14,6 +14,13 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(compareGroups)
+library(patchwork)
+library(gtsummary)
+library(ggdist)
+library(gghalves)
+library(epiR)
+
+
 
 ```
 
@@ -27,7 +34,7 @@ load("ATP_final.RData")
 # 1. Mean
 
 ```{r}
-round(sapply((datos_combinados %>% select(where(is.numeric))), mean, na.rm = TRUE),4)
+round(sapply((datos_combinados %>% dplyr::select(where(is.numeric))), mean, na.rm = TRUE), 4)
 ```
 
 
@@ -82,17 +89,21 @@ PR_summary <- PR_summary %>%
 
 
 ```{r}
+PR_summary$year <- as.numeric(PR_summary$year)
+
 PRI <- ggplot(PR_summary, aes(x = year, y = PR_ratio)) +
   geom_point() +
   geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
-  labs(title = "Prevalence of protected ranking by Year with 95% Confidence Interval", 
+  labs(title = "Presence of Protected Ranking by Year", 
        x = "Year", 
-       y = "Prevalence (PR = Yes)") +
+       y = "Presence (PR = Yes)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90)) +
-   scale_y_continuous(limits = c(0, 0.03)) 
+  scale_y_continuous(limits = c(0, 0.03)) +
+  scale_x_continuous(breaks = seq(min(PR_summary$year), max(PR_summary$year), by = 5))
 
 PRI
+
 
 ```
 
@@ -130,19 +141,33 @@ LL_summary <- LL_summary %>%
 
 
 ```{r}
+
+LL_summary$year <- as.numeric(LL_summary$year)
+
 LLI <- ggplot(LL_summary, aes(x = year, y = LL_ratio)) +
   geom_point() +
   geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
-  labs(title = "Prevalence of Lucky loser by Year with 95% Confidence Interval", 
+  labs(title = "Presence of Lucky Loser by Year", 
        x = "Year", 
-       y = "Prevalence (LL = Yes)") +
+       y = "Presence (LL = Yes)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90)) +
-   scale_y_continuous(limits = c(0, 0.1)) 
+  scale_y_continuous(limits = c(0, 0.1)) +
+  scale_x_continuous(breaks = seq(min(LL_summary$year), max(LL_summary$year), by = 5))
 
 LLI
 
+
 ```
+
+```{r}
+
+combined_plot <- LLI + PRI + plot_layout(ncol = 2)
+
+ggsave("combined_plot_year.tiff", plot = combined_plot, width = 10, height = 5, dpi = 300, device = "tiff")
+```
+
+
 
 
 ## Prevalence PR by level
@@ -176,7 +201,7 @@ PR_summary_l <- PR_summary_l %>%
 PRlevel <- ggplot(PR_summary_l, aes(x = tourney_level, y = PR_ratio)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2) +
-  labs(title = "Prevalence of Lucky loser by level with 95% Confidence Interval", 
+  labs(title = "Prevalence of PR by level with 95% Confidence Interval", 
        x = "Year", 
        y = "Prevalence (PR = Yes)") +
   theme_minimal() +
@@ -771,7 +796,7 @@ There are 45 matches with a LL/PR or two of them.
 ```{r}
 
 unique_ll_per_tournament <- datos_combinados %>%
-  select(tourney_id, winner_id, loser_id, LLW, LLL) %>%
+  dplyr::select(tourney_id, winner_id, loser_id, LLW, LLL) %>%
   pivot_longer(cols = c(winner_id, loser_id), names_to = "player_type", values_to = "player_id") %>%
   # Keep only matches where players are LL
   filter((player_type == "winner_id" & LLW == 1) | (player_type == "loser_id" & LLL == 1)) %>%
@@ -804,7 +829,7 @@ binom.test(sum(unique_ll_per_tournament$unique_LL_count), n_distinct(datos_combi
 # Create a new dataframe that counts unique PR per tournament
 unique_pr_per_tournament <- datos_combinados %>%
   # Create a temporary dataframe to identify PR players in each match
-  select(tourney_id, winner_id, loser_id, PRW, PRL) %>%
+  dplyr::select(tourney_id, winner_id, loser_id, PRW, PRL) %>%
   pivot_longer(cols = c(winner_id, loser_id), names_to = "player_type", values_to = "player_id") %>%
   # Keep only matches where players are PR
   filter((player_type == "winner_id" & PRW == 1) | (player_type == "loser_id" & PRL == 1)) %>%
@@ -877,10 +902,31 @@ compareGroups(PR_loses ~ ., method = NA, data = datos_combinados)
 
 ```
 
+
+
+```{r}
+
+datos_combinados <- datos_combinados %>%
+  mutate(round = case_when(
+    round %in% c("R128", "R16", "R32", "R64", "RR") ~ "Preliminary",
+    TRUE ~ round # Keep other values unchanged
+  ))
+
+
+descrTable(LL_wins ~ surface + tourney_level + winner_id + winner_entry + winner_hand 
+           + winner_age + loser_id +  loser_entry + loser_hand + loser_age + best_of 
+           + round  + winner_rank + loser_rank + games + dif_age + dif_rank, data = datos_combinados, byrow = TRUE, show.p.overall = FALSE, digits = 2, method = c(mean_age=NA), alpha=0.05)
+
+
+descrTable(PR_wins ~ surface + tourney_level + winner_id + winner_entry + winner_hand 
+           + winner_age + loser_id +  loser_entry + loser_hand + loser_age + best_of 
+           + round  + winner_rank + loser_rank + games + dif_age + dif_rank, data = datos_combinados, byrow = TRUE, show.p.overall = FALSE, digits = 2, method = c(mean_age=NA), alpha=0.05)
+
+```
+
 # 5. Special entries matches 
 
 ```{r}
-library(dplyr)
 
 categorize_match <- function(winner_entry, loser_entry) {
   if (grepl("LL", winner_entry) & grepl("LL", loser_entry)) {
@@ -901,7 +947,7 @@ table_summary <- datos_combinados %>%
   summarize(nmatches = n())
 
 table_summary <- table_summary %>%
-  select(match_type, nmatches) %>%
+  dplyr::select(match_type, nmatches) %>%
   pivot_wider(names_from = match_type, values_from = nmatches, 
               values_fill = list(nmatches = 0))
 
@@ -920,7 +966,6 @@ table_summary
 
 
 ```{r}
-library(gtsummary)
 
 tbl_summary(data = datos_combinados, by = PR, include = c(year, surface, tourney_level, winner_hand, loser_hand, dif_age, winner_rank, loser_rank))
 
@@ -940,9 +985,6 @@ tbl_summary(data = datos_combinados, by = LL, include = c(year, surface, tourney
 
 ```{r, eval= FALSE}
 
-library(ggplot2)
-library(ggdist)
-library(gghalves)
 
 ggplot(datos_combinados, aes(x = LL, y = dif_age)) + 
   ggdist::stat_halfeye(
@@ -998,13 +1040,7 @@ ggplot(datos_combinados, aes(x = PR, y = dif_age)) +
 
 ```{r}
 
-# Load necessary libraries
-library(ggplot2)
-library(ggdist)
-library(gghalves)
-library(patchwork)
 
-# Create the first plot (LL)
 plot_LL <- ggplot(datos_combinados, aes(x = LL, y = dif_age)) + 
   ggdist::stat_halfeye(
     adjust = .5, 
@@ -1024,7 +1060,7 @@ plot_LL <- ggplot(datos_combinados, aes(x = LL, y = dif_age)) +
   ) +
   coord_cartesian(xlim = c(1.2, 2.9), clip = "off")
 
-# Create the second plot (PR)
+
 plot_PR <- ggplot(datos_combinados, aes(x = PR, y = dif_age)) + 
   ggdist::stat_halfeye(
     adjust = .5, 
@@ -1044,10 +1080,10 @@ plot_PR <- ggplot(datos_combinados, aes(x = PR, y = dif_age)) +
   ) +
   coord_cartesian(xlim = c(1.2, 2.9), clip = "off")
 
-# Combine the plots
+
 combined_plot <- plot_LL + plot_PR
 
-# Save the combined plot as a TIFF file
+
 ggsave("combined_plot.tiff", plot = combined_plot, width = 12, height = 6, dpi = 300, device = "tiff")
 
 ```
@@ -1337,7 +1373,7 @@ ggplot(datos_combinados, aes(x = PR, y = tourney_level)) +
 
 
 ```{r}
-library(epiR)
+
 
 
 
@@ -1388,7 +1424,7 @@ epi.2by2(
 )
 
 
-
+load("ATP_final.RData")
 
 # Round level. Reference: Final
 
@@ -1450,34 +1486,40 @@ epi.2by2(
 
 Valores_M_A_LL <- c(tabla_tourney_level_LL["A", "Yes"], tabla_tourney_level_LL["A", "No"], tabla_tourney_level_LL["M", "Yes"], tabla_tourney_level_LL["M", "No"])
 
-epi.2by2(dat = Valores_M_A_LL, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_M_A_LL,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 
 Valores_M_G_LL <- c(tabla_tourney_level_LL["G", "Yes"], tabla_tourney_level_LL["G", "No"], tabla_tourney_level_LL["M", "Yes"], tabla_tourney_level_LL["M", "No"])
-epi.2by2(dat = Valores_M_G_LL, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_M_G_LL,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 Valores_M_F_LL <- c(tabla_tourney_level_LL["F", "Yes"], tabla_tourney_level_LL["F", "No"], tabla_tourney_level_LL["M", "Yes"], tabla_tourney_level_LL["M", "No"])
-epi.2by2(dat = Valores_M_F_LL, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_M_F_LL,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 
@@ -1486,13 +1528,15 @@ epi.2by2(dat = Valores_M_F_LL,
 
 
 Valores_winner_hand <- c(table_LL_winner_hand["Yes", "R"], table_LL_winner_hand["No", "R"], table_LL_winner_hand["Yes", "L"], table_LL_winner_hand["No", "L"])
-epi.2by2(Valores_winner_hand , 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_winner_hand,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 # LL and Loser Hand. Refrence: Left
@@ -1500,14 +1544,58 @@ epi.2by2(Valores_winner_hand ,
 (table_LL_loser_hand <- table(datos_combinados$LL, datos_combinados$loser_hand))
 
 Valores_loser_hand <- c(table_LL_loser_hand["Yes", "R"], table_LL_loser_hand["No", "R"], table_LL_loser_hand["Yes", "L"], table_LL_loser_hand["No", "L"])
-epi.2by2(Valores_loser_hand, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_loser_hand,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
+
+
+
+# best_of. Reference: 1
+
+
+
+(tabla_best_LL <- table(datos_combinados$best_of, datos_combinados$LL))
+
+Valores_1_3 <- c(tabla_best_LL["1", "Yes"], tabla_best_LL["1", "No"], 
+                           tabla_best_LL["3", "Yes"], tabla_best_LL["3", "No"])
+
+
+epi.2by2(
+  dat = Valores_1_3,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
+
+
+
+Valores_5_3 <- c(tabla_best_LL["5", "Yes"], tabla_best_LL["5", "No"], 
+                           tabla_best_LL["3", "Yes"], tabla_best_LL["3", "No"])
+
+
+epi.2by2(
+  dat = Valores_5_3,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
+
+
 ```
+
+
 
 
 ## PR 
@@ -1626,34 +1714,40 @@ epi.2by2(
 
 Valores_M_A_PR <- c(tabla_tourney_level_PR["A", "Yes"], tabla_tourney_level_PR["A", "No"], tabla_tourney_level_PR["M", "Yes"], tabla_tourney_level_PR["M", "No"])
 
-epi.2by2(dat = Valores_M_A_PR, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_M_A_PR ,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 
 Valores_M_G_PR <- c(tabla_tourney_level_PR["G", "Yes"], tabla_tourney_level_PR["G", "No"], tabla_tourney_level_PR["M", "Yes"], tabla_tourney_level_PR["M", "No"])
-epi.2by2(dat = Valores_M_G_PR, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_M_G_PR ,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 Valores_M_F_PR <- c(tabla_tourney_level_PR["F", "Yes"], tabla_tourney_level_PR["F", "No"], tabla_tourney_level_PR["M", "Yes"], tabla_tourney_level_PR["M", "No"])
-epi.2by2(dat = Valores_M_F_PR, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_M_F_PR ,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 
@@ -1662,13 +1756,15 @@ epi.2by2(dat = Valores_M_F_PR,
 
 
 Valores_winner_hand <- c(table_PR_winner_hand["Yes", "R"], table_PR_winner_hand["No", "R"], table_PR_winner_hand["Yes", "L"], table_PR_winner_hand["No", "L"])
-epi.2by2(Valores_winner_hand , 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_winner_hand ,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
 
 
 # PR and Loser Hand. Refrence: Left
@@ -1676,13 +1772,179 @@ epi.2by2(Valores_winner_hand ,
 (table_PR_loser_hand <- table(datos_combinados$PR, datos_combinados$loser_hand))
 
 Valores_loser_hand <- c(table_PR_loser_hand["Yes", "R"], table_PR_loser_hand["No", "R"], table_PR_loser_hand["Yes", "L"], table_PR_loser_hand["No", "L"])
-epi.2by2(Valores_loser_hand, 
-                           method = "cohort.time", 
-                           digits = 2, 
-                           conf.level = 0.95, 
-                           units = 1000,
-                           interpret = FALSE, 
-                           outcome = "as.columns")
+epi.2by2(
+  dat = Valores_loser_hand ,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
+
+# best_of. Reference: 3
+
+
+
+(tabla_best_PR <- table(datos_combinados$best_of, datos_combinados$PR))
+
+Valores_1_3 <- c(tabla_best_PR["1", "Yes"], tabla_best_PR["1", "No"], 
+                           tabla_best_PR["3", "Yes"], tabla_best_PR["3", "No"])
+
+
+epi.2by2(
+  dat = Valores_1_3,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
+
+
+
+Valores_5_1 <- c(tabla_best_PR["5", "Yes"], tabla_best_PR["5", "No"], 
+                           tabla_best_PR["3", "Yes"], tabla_best_PR["3", "No"])
+
+
+epi.2by2(
+  dat = Valores_5_3,
+  method = "cohort.count", 
+  digits = 2, 
+  conf.level = 0.95, 
+  units = 1000, 
+  interpret = FALSE, 
+  outcome = "as.columns"
+)
+
 ```
+
+# 9. Proability of winning 
+
+```{r}
+
+# LL vs PR
+
+matches_LL_PR <- datos_combinados %>%
+  filter(
+    LL == "Yes" &  # The match involves a lucky loser (LL)
+    (winner_entry == "PR" | loser_entry == "PR")  # One of the players is a protected ranking player (PR)
+  )
+
+# Number of LL wins against PR / total number of matches involving LL against PR
+prop.test(sum(matches_LL_PR$LLW == 1), nrow(matches_LL_PR), conf.level = 0.95)
+
+
+# LL vs LL
+
+matches_LL_vs_LL <-   datos_combinados %>% filter(
+    LL == "Yes" &  (winner_entry == "LL" & loser_entry == "LL"))
+
+prop.test(sum(matches_LL_vs_LL$LLW == 1), nrow(matches_LL_vs_LL), conf.level = 0.95)
+
+
+# LL vs Direct entry
+
+matches_LL_vs_DE <- datos_combinados[datos_combinados$LL == "Yes" & 
+                                     (datos_combinados$winner_entry %in% c("Q", "WC", "ITF") | 
+                                      datos_combinados$loser_entry %in% c("Q", "WC", "ITF")), ]
+
+
+prop.test(sum(matches_LL_vs_DE$LLW == 1), nrow(matches_LL_vs_DE), conf.level = 0.95)
+
+# LL vs SE
+
+matches_LL_vs_SE <- datos_combinados %>%
+  filter(LL == "Yes" & (winner_entry == "SE" | loser_entry == "SE"))
+
+
+prop.test(sum(matches_LL_vs_SE$LLW == 1), nrow(matches_LL_vs_SE), conf.level = 0.95)
+
+# LL vs Alt
+
+matches_LL_vs_alt <- datos_combinados[datos_combinados$LL == "Yes" & 
+                                     (datos_combinados$winner_entry %in% c("Alt", "ALT") | 
+                                      datos_combinados$loser_entry %in% c("Alt", "ALT")), ]
+
+
+# prop.test(sum(matches_LL_vs_alt$LLW == 1), nrow(matches_LL_vs_alt), conf.level = 0.95)
+## Not found
+
+
+# LL vs normal entry
+
+matches_LL_vs_normal <- datos_combinados[datos_combinados$LL == "Yes" & 
+                                         (is.na(datos_combinados$winner_entry) | 
+                                          is.na(datos_combinados$loser_entry)), ]
+
+prop.test(sum(matches_LL_vs_normal$LLW == 1), nrow(matches_LL_vs_normal), conf.level = 0.95)
+
+
+```
+
+
+```{r}
+
+# PR vs LL
+
+matches_PR_LL <- datos_combinados %>%
+  filter(
+    PR == "Yes" &  
+    (winner_entry == "LL" | loser_entry == "LL"))
+
+prop.test(sum(matches_PR_LL$PRW == 1), nrow(matches_PR_LL), conf.level = 0.95)
+
+
+# PR vs PR
+
+matches_PR_vs_PR <- datos_combinados %>% filter(
+    LL == "Yes" &  (winner_entry == "PR" & loser_entry == "PR"))
+#prop.test(sum(matches_PR_vs_PR$PRW == 1), nrow(matches_PR_vs_PR), conf.level = 0.95)
+#0/0
+
+# PR vs Direct entry
+
+matches_PR_vs_DE <- datos_combinados[datos_combinados$PR == "Yes" & 
+                                     (datos_combinados$winner_entry %in% c("Q", "WC", "ITF") | 
+                                      datos_combinados$loser_entry %in% c("Q", "WC", "ITF")), ]
+
+
+prop.test(sum(matches_PR_vs_DE$PRW == 1), nrow(matches_PR_vs_DE), conf.level = 0.95)
+
+
+# PR vs SE
+
+matches_PR_vs_SE <- datos_combinados %>%
+  filter(PR == "Yes" & (winner_entry == "SE" | loser_entry == "SE"))
+
+
+prop.test(sum(matches_PR_vs_SE$PRW == 1), nrow(matches_PR_vs_SE), conf.level = 0.95)
+
+# PR vs Alt
+
+matches_PR_vs_alt <- datos_combinados[datos_combinados$PR == "Yes" & 
+                                     (datos_combinados$winner_entry %in% c("Alt", "ALT") | 
+                                      datos_combinados$loser_entry %in% c("Alt", "ALT")), ]
+
+
+# prop.test(sum(matches_PR_vs_alt$PRW == 1), nrow(matches_PR_vs_alt), conf.level = 0.95)
+## Not found
+
+
+# PR vs normal entry
+
+matches_PR_vs_normal <- datos_combinados[datos_combinados$PR == "Yes" & 
+                                         (is.na(datos_combinados$winner_entry) | 
+                                          is.na(datos_combinados$loser_entry)), ]
+
+prop.test(sum(matches_PR_vs_normal$PRW == 1), nrow(matches_PR_vs_normal), conf.level = 0.95)
+
+
+```
+
+
+
+
 
 

@@ -1,0 +1,239 @@
+---
+title: "New database"
+author: "Ana Abad"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(dplyr)
+library(compareGroups)
+```
+
+
+```{r}
+load("ATP_final.RData")
+data <- dplyr::select(datos_combinados, -LL, -PR)
+```
+
+
+# 1. New database
+
+Each column represents a player, which can be either the loser or the winner of the match. 
+That means that variables related to the match or differences between winners/losers are duplicated.
+
+
+```{r}
+
+
+players_data_W <- data %>%
+  mutate(player_role = "winner") %>%
+  rename(
+    ID = winner_id, 
+    entry = winner_entry,
+    hand = winner_hand,
+    ioc = winner_ioc,
+    age = winner_age,
+    rank = winner_rank,
+    LL = LLW,
+    PR = PRW) %>%
+  dplyr::select(tourney_id, tourney_name, surface, tourney_level, year, ID, entry, hand, ioc, age, rank, 
+         dif_age, dif_rank, round, LL, PR, player_role)
+
+
+players_dataL <- data %>%
+      mutate(player_role = "loser") %>%
+      rename(
+        ID = loser_id,
+        entry = loser_entry,
+        hand = loser_hand,
+        ioc = loser_ioc,
+        age = loser_age,
+        rank = loser_rank,
+        LL = LLL,
+        PR = PRL
+      ) %>%
+      dplyr::select(tourney_id, tourney_name, surface, tourney_level, year, ID, entry, hand, ioc, age, rank, 
+             dif_age, dif_rank, round, LL, PR, player_role)
+
+players_data <- rbind(players_dataL, players_data_W)
+
+
+```
+
+# 2. Summary 
+
+```{r}
+summary(players_data)
+```
+
+# 3. Victories and defeats
+
+
+## Number of tournaments included in the dataset 
+```{r}
+tour <- length(unique(players_data$tourney_id))
+
+tour
+```
+
+## PR in tournaments
+
+```{r}
+players_data %>%
+  group_by(tourney_id) %>%
+  filter(PR == 1) %>%
+  ungroup()
+```
+## LL matches won and lost 
+
+```{r}
+
+# Filter the data for losing players who were lucky losers
+LL_losers <- players_data %>%
+  filter(player_role == "loser" & LL == 1) %>%
+  # Group by tournament ID and count occurrences
+  group_by(tourney_id, tourney_name) %>%
+  summarise(matches_lost = n()) %>%
+  ungroup()
+
+
+
+LL_winners <- players_data %>%
+  filter(player_role == "winner" & LL == 1) %>%
+  group_by(tourney_id, tourney_name) %>%
+  summarise(matches_won = n()) %>%
+  ungroup()
+
+played_ll <- players_data %>%
+  filter(LL == 1) %>%
+  group_by(tourney_id, tourney_name) %>%
+  summarise(matches_played = n()) %>%
+  ungroup()
+
+
+LL <- merge(LL_losers, played_ll)
+LL$defeats <- LL$matches_lost/LL$matches_played
+LL
+
+LLW <- merge(LL_winners, played_ll)
+LLW$victories <- LLW$matches_won/LLW$matches_played
+LLW
+
+
+new_ll <- merge(LL, LLW)
+
+
+```
+
+
+
+## PR matches won and lost 
+
+```{r}
+
+
+PR_losers <- players_data %>%
+  filter(player_role == "loser" & PR == 1) %>%
+  group_by(tourney_id, tourney_name) %>%
+  summarise(matches_lost = n()) %>%
+  ungroup()
+
+
+
+PR_winners <- players_data %>%
+  filter(player_role == "winner" & PR == 1) %>%
+  group_by(tourney_id, tourney_name) %>%
+  summarise(matches_won = n()) %>%
+  ungroup()
+
+played_PR <- players_data %>%
+  filter(PR == 1) %>%
+  group_by(tourney_id, tourney_name) %>%
+  summarise(matches_played = n()) %>%
+  ungroup()
+
+
+PR <- merge(PR_losers, played_PR)
+PR$defeats <- PR$matches_lost/PR$matches_played
+PR
+
+PRW <- merge(PR_winners, played_PR)
+PRW$victories <- PRW$matches_won/PRW$matches_played
+PRW
+
+new_PR <- merge(PR, PRW)
+
+
+
+
+```
+
+## Mean victories
+
+```{r}
+mean(LLW$victories)
+mean(PRW$victories)
+
+
+## LL victories
+binom.test(sum(new_ll$matches_won), sum(new_ll$matches_played))
+## LL defeats
+binom.test(sum(new_ll$matches_lost), sum(new_ll$matches_played))
+
+
+mean(LL$defeats)
+mean(PR$defeats)
+
+
+
+## PR victories
+binom.test(sum(new_PR$matches_won), sum(new_PR$matches_played))
+## PR defeats
+binom.test(sum(new_PR$matches_lost), sum(new_PR$matches_played))
+
+
+
+
+```
+
+
+
+# n LL in 1973
+
+```{r}
+unique(players_data %>%
+         filter(LL == 1 & tourney_id == "1973-540"))
+```
+
+
+
+
+```{r}
+
+compareGroups(player_role ~ LL + PR, data = players_data)
+```
+
+## Final winners
+
+```{r}
+
+winners <- players_data_W %>%
+  filter(round == "F")
+
+winners$entry <- as.character(winners$entry)
+sum(winners$entry == "PR", na.rm = TRUE)
+sum(winners$entry == "LL", na.rm = TRUE)
+
+```
+
+
+
+
+

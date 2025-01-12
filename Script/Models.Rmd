@@ -18,6 +18,20 @@ data <- datos_combinados
 library(car)
 library(dplyr)
 library(DHARMa)
+library(corrplot)
+library(ggplot2)
+library(dplyr)
+library(data.table)
+library(mgcv)
+library(mgcViz)
+library(lme4)
+library(MASS)
+library(splines)
+library(caret)
+library(broom)
+library(emmeans)
+
+
 ```
 
 
@@ -31,8 +45,9 @@ Response: LLW, PRW, LLL, PRL
 data$tourney_level    <- as.factor(data$tourney_level)
 data$surface          <- as.factor(data$surface)
 data$round_level      <- as.factor(data$round)
+data$best_of          <- as.factor(data$best_of)
 
-#Response variables
+# Response variables
 data$LLW              <- as.factor(data$LLW)
 data$LLL              <- as.factor(data$LLL)
 data$PRW              <- as.factor(data$PRW)
@@ -50,7 +65,7 @@ data$dif_rank         <- as.numeric(data$dif_rank)
 data$tourney_level <- relevel(data$tourney_level, ref = "M") # Masters
 data$surface          <- relevel(data$surface,          ref = "Grass")
 data$round_level      <- relevel(data$round_level,      ref = "F") #Final
-
+data$best_of      <- relevel(data$best_of, ref = 3)
 
 ```
 
@@ -91,13 +106,21 @@ fisher.test(data$year, data$winner_hand, simulate.p.value=TRUE)
 
 chisq.test(data$loser_hand, data$winner_hand)
 
+
+fisher.test(data$best_of, data$surface, simulate.p.value=TRUE)
+fisher.test(data$best_of, data$round, , simulate.p.value=TRUE)
+fisher.test(data$best_of, data$tourney_level, , simulate.p.value=TRUE)
+chisq.test(data$best_of, data$winner_hand)
+fisher.test(data$best_of, data$loser_hand, , simulate.p.value=TRUE)
+fisher.test(data$best_of, data$year, , simulate.p.value=TRUE)
+
+
 ```
 
 
 # Interaction
 
 ```{r}
-library(corrplot)
 
 cor_data <- data[, c("year", "dif_rank", "dif_age")]
 cor_matrix <- cor(cor_data, use = "complete.obs")
@@ -106,7 +129,7 @@ corrplot(cor_matrix, method = "shade", type = "lower")
 ```
 
 ```{r}
-library(ggplot2)
+
 ggplot(data, aes(x = surface, y = dif_age, fill = round)) +
   geom_boxplot() +
   labs(title = "Interaction: Surface, Round, and dif_age") +
@@ -145,7 +168,6 @@ ggplot(data, aes(x = year, fill = loser_hand)) +
 There seems to be interaction between year and all categorical variables, but the associations are low. 
 
 ```{r}
-
 vcd::assocstats(table(data$surface, data$round))
 ggplot(data, aes(x = surface, fill = round)) +
   geom_bar(position = "dodge") +
@@ -171,9 +193,42 @@ ggplot(data, aes(x = loser_hand, fill = winner_hand)) +
   geom_bar(position = "dodge") +
   labs(title = "Association Between loser_hand and winner_hand", x = "loser_hand", y = "Count") +
   theme_minimal()
+```
+The associations and the correlations are low.
+
+```{r}
+vcd::assocstats(table(data$best_of, data$winner_hand))
+ggplot(data, aes(x = best_of, fill = winner_hand)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Association Between best_of and winner_hand", x = "best_of", y = "Count") +
+  theme_minimal()
+
+vcd::assocstats(table(data$best_of, data$loser_hand))
+ggplot(data, aes(x = best_of, fill = loser_hand)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Association Between best_of and Loser_hand", x = "best_of", y = "Count") +
+  theme_minimal()
+
+vcd::assocstats(table(data$best_of, data$surface))
+ggplot(data, aes(x = best_of, fill = surface)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Association Between best_of and surface", x = "best_of", y = "Count") +
+  theme_minimal()
+
+vcd::assocstats(table(data$best_of, data$tourney_level))
+ggplot(data, aes(x = best_of, fill = tourney_level)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Association Between best_of and tourney_level", x = "best_of", y = "Count") +
+  theme_minimal()
+
+vcd::assocstats(table(data$best_of, data$round))
+ggplot(data, aes(x = best_of, fill = round)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Association Between best_of and round", x = "best_of", y = "Count") +
+  theme_minimal()
 
 ```
-The associations and the correlations are low. 
+The associations and the correlations are low, except for tourney_level, which was high, and round, which were moderate. Therefore, best_of will be excluded from the possible variables to avoid multicolinearity. 
 
 
 # Lineality
@@ -340,8 +395,7 @@ Despite non-linearity, a glm will be fitted although it could not be the best ap
 
 
 ```{r}
-library(dplyr)
-library(data.table)
+
 
 
 data_grouped_LLW <- data_LL[,c("tourney_level", "year", "surface", "winner_hand", "loser_hand", "dif_age", "dif_rank", "games", "LLW", "loser_id", "winner_id", "loser_rank", "loser_age", "winner_rank", "winner_age")]
@@ -530,8 +584,7 @@ ANOVA proposes glm_4 as the best model. Since step_4 has a lower AIC and less te
 
 
 ```{r}
-library(mgcv)
-library(mgcViz)
+
 
 
 # Fitting GAM with smooth terms for dif_rank and dif_age
@@ -567,9 +620,10 @@ testDispersion(gam_model_LL)
 
 7 different models, since step function does not work with GLMM
 
+Tourney level used as random effect 
 
 ```{r}
-library(lme4)
+
 
 mixed_1 <- glmer(LLW ~ year + surface + dif_age + dif_rank + winner_hand + loser_hand + 
                  offset(log(games)) + (1|tourney_level), 
@@ -649,6 +703,29 @@ sum(residuals(mixed_7, type = "pearson")^2) / df.residual(mixed_7)
 
 ```
 
+year used as random effect
+
+
+```{r}
+
+mixed_8 <- glmer(LLW ~ tourney_level + year + surface + 
+                   dif_age + dif_rank + winner_hand + loser_hand + 
+                   (1 | year),
+                   family = binomial, offset = log(games), data = data_grouped_LLW)
+summary(mixed_8)
+testDispersion(mixed_8)
+sum(residuals(mixed_8, type = "pearson")^2) / df.residual(mixed_7)
+
+
+
+```
+winner_id and loser_id cannit be used as a random effect because the number of random-effects parameters exceeds the number of observations, making the model unidentifiable and preventing reliable estimation of the random-effects variance components.
+
+
+
+
+
+
 
 ## Model 8: Quadratic
 
@@ -685,22 +762,18 @@ sum(residuals(step_quadtratic, type = "pearson")^2) / step_quadtratic$df.residua
 ```{r}
 
 
-# Aggregate data while including additional predictors (e.g., 'winner_hand', 'loser_hand')
 data_aggregated <- data_grouped_LLW %>%
   group_by(winner_id) %>%
   summarise(
     total_wins = sum(LLW == 1),  # Count of wins (LLW = 1)
     total_games = sum(games),           # Count of total games played
-    winner_hand = first(winner_hand),  # Select the first winner_hand (or use mode if needed)
+    winner_hand = first(winner_hand),  # Select the first winner_hand 
     loser_hand = first(loser_hand),    # Select the first loser_hand
-    dif_rank = mean(dif_rank, na.rm = TRUE),  # Take the mean of dif_rank for each winner_id
-    dif_age = mean(dif_age, na.rm = TRUE),    # Similarly, take the mean of dif_age
-    surface = first(surface),           # Select the first surface (or use mode if needed)
+    dif_rank = mean(dif_rank, na.rm = TRUE),  # Take the mean of dif_rank
+    dif_age = mean(dif_age, na.rm = TRUE),    #Take the mean of dif_age
+    surface = first(surface),           # Select the first surface 
     year = first(year)                  # Select the first year
   )
-
-# Check the aggregated data
-head(data_aggregated)
 
 
 poisson_model <- glm(total_wins ~ dif_rank + dif_age + winner_hand + loser_hand + 
@@ -755,7 +828,7 @@ AIC(step_pois2)
 #### Model 10: Negative binomial regresion 
 
 ```{r}
-library(MASS)
+
 nbr_1 <- glm.nb(total_wins ~ dif_rank + dif_age + winner_hand + loser_hand + 
                      surface + year + offset(log(total_games)), 
                      data = data_aggregated)
@@ -790,6 +863,9 @@ new_data_grouped_LL <- data_grouped_LLW %>%
       dif_age > 5 ~ "OlderWinner"    
     )
   )
+new_data_grouped_LL$rank_category <- factor(new_data_grouped_LL$rank_category)
+new_data_grouped_LL$rank_category  <- relevel(new_data_grouped_LL$rank_category, ref = "Medium")
+
 ```
 
 
@@ -799,13 +875,13 @@ data_aggregated_2 <- new_data_grouped_LL %>%
   summarise(
     total_wins = sum(LLW == 1),  # Count of wins (LLW = 1)
     total_games = sum(games),           # Count of total games played
-    winner_hand = first(winner_hand),  # Select the first winner_hand (or use mode if needed)
+    winner_hand = first(winner_hand),  # Select the first winner_hand 
     loser_hand = first(loser_hand),    # Select the first loser_hand
-    dif_rank = mean(dif_rank, na.rm = TRUE),  # Take the mean of dif_rank for each winner_id
-    rank_category = first(rank_category),
-    age_category = first(age_category),
-    dif_age = mean(dif_age, na.rm = TRUE),    # Similarly, take the mean of dif_age
-    surface = first(surface),           # Select the first surface (or use mode if needed)
+    dif_rank = mean(dif_rank, na.rm = TRUE),  # Take the mean of dif_rank 
+    rank_category = first(rank_category), # Select the first category
+    age_category = first(age_category), # Select the first category
+    dif_age = mean(dif_age, na.rm = TRUE),    # Take the mean of dif_age
+    surface = first(surface),           # Select the first surface
     year = first(year)                  # Select the first year
   )
 ```
@@ -956,8 +1032,7 @@ Despite non-linearity, a glm will be fitted although it could not be the best ap
 
 
 ```{r}
-library(dplyr)
-library(data.table)
+
 
 
 data_grouped_PRW <- data_PR[,c("tourney_level", "year", "surface", "winner_hand", "loser_hand", "dif_age", "dif_rank", "games", "PRW", "loser_id", "winner_id", "winner_age", "loser_age", "winner_rank", "loser_rank")]
@@ -1070,7 +1145,7 @@ sum(residuals(step_3_PR, type = "pearson")^2) / step_3_PR$df.residual
 
 
 ```{r}
-library(DHARMa)
+
 
 # The best model at the moment is step_3 (lowest AIC)
 
@@ -1163,7 +1238,7 @@ new_data_grouped_PRW$dif_rank_category <- cut(
     "Very High LIB"   # More than 1200
   ),
   include.lowest = TRUE,
-  right = FALSE  # Ensure intervals are inclusive of lower bounds
+  right = FALSE 
 )
 
 new_data_grouped_PRW$dif_age_category <- cut(
@@ -1180,7 +1255,7 @@ new_data_grouped_PRW$dif_age_category <- cut(
     "High LIB"        # Above 15
   ),
   include.lowest = TRUE,
-  right = FALSE  # Ensure intervals are inclusive of lower bounds
+  right = FALSE  
 )
 
 
@@ -1207,7 +1282,7 @@ testDispersion(step_6_PR)
 Using a more "restrictive" categorization, based on https://data.scorenetwork.org/tennis/australian-open.html
 
 ```{r}
-library(dplyr)
+
 
 
 new_data_grouped_PRW_2 <- data_grouped_PRW %>%
@@ -1268,6 +1343,8 @@ new_data_grouped_PRW_3 <- data_grouped_PRW %>%
       dif_age > 5 ~ "OlderWinner"    
     )
   )
+new_data_grouped_PRW_3$rank_category <- factor(new_data_grouped_PRW_3$rank_category)
+new_data_grouped_PRW_3$rank_category  <- relevel(new_data_grouped_PRW_3$rank_category, ref = "Medium")
 
 
 glm_8_PR <- glm(PRW ~ tourney_level + year + surface + 
@@ -1300,8 +1377,7 @@ testDispersion(step_8_PR)
 ### GAM
 
 ```{r}
-library(mgcv)
-library(mgcViz)
+
 
 
 # Fitting GAM with smooth terms for dif_rank and dif_age
@@ -1310,7 +1386,7 @@ gam_model_PR <- gam(PRW ~ s(dif_rank, bs = "cr") + s(dif_age, bs = "cr") + #cubi
                  family = binomial, 
                  data = data_grouped_PRW)
 
-# Summary of the GAM model
+
 summary(gam_model_PR)
 
 
@@ -1339,7 +1415,7 @@ testDispersion(gam_model_PR_2)
 ```{r}
 
 
-library(splines)
+
 splines_PR_1 <- glm(PRW ~ ns(dif_age, 3) + ns(dif_rank, 3) + tourney_level + surface + winner_hand + loser_hand,
                  family = binomial, 
                  data = new_data_grouped_PRW)
@@ -1400,7 +1476,6 @@ sum(residuals(glm_9_PR, type = "pearson")^2) / glm_9_PR$df.residual
 
 
 
-## Selection by AIC criteria using step function
 
 step_9_PR <- step(glm_9_PR)
 summary(step_9_PR)
@@ -1449,6 +1524,8 @@ sum(residuals(step_10_PR, type = "pearson")^2) / step_10_PR$df.residual
 ## Best model LL
 
 ```{r}
+
+
 summary(step_6)
 plot(step_6)
 vif(step_6)
@@ -1462,6 +1539,9 @@ exp(cbind(OR = coef(step_6), confint(step_6)))
 ## Best model PR
 
 ```{r}
+
+
+
 summary(step_8_PR)
 plot(step_8_PR)
 vif(step_8_PR)
@@ -1476,6 +1556,7 @@ exp(cbind(OR = coef(step_8_PR), confint(step_8_PR)))
 # Validation
 
 ```{r}
+
 
 incomplete_data_LL <- data_LL[!complete.cases(data_LL) & data_LL$games != 0, ]
 incomplete_data_LL <- incomplete_data_LL %>%
@@ -1492,7 +1573,11 @@ incomplete_data_LL <- incomplete_data_LL %>%
     )
   )
 
-incomplete_data_PR <- data_LL[!complete.cases(data_PR) & data_PR$games != 0, ]
+
+complete_data_LL_validation <- incomplete_data_LL[complete.cases(incomplete_data_LL[, c("tourney_level", "rank_category")]), ]
+
+
+incomplete_data_PR <- data_PR[!complete.cases(data_PR) & data_PR$games != 0, ]
 incomplete_data_PR <- incomplete_data_PR %>%
   mutate(
     rank_category = case_when(
@@ -1508,6 +1593,8 @@ incomplete_data_PR <- incomplete_data_PR %>%
   )
 incomplete_data_PR$surface[!incomplete_data_PR$surface %in% levels(incomplete_data_PR$surface)] <- NA
 
+complete_data_PR_validation <- incomplete_data_PR[complete.cases(incomplete_data_PR[, c("rank_category", "age_category")]), ]
+
 
 
 ```
@@ -1516,13 +1603,13 @@ incomplete_data_PR$surface[!incomplete_data_PR$surface %in% levels(incomplete_da
 
 ```{r}
 
-pred_probs <- predict(step_6, newdata = incomplete_data_LL, type = "response")
+pred_probs <- predict(step_6, newdata = complete_data_LL_validation, type = "response")
 pred_classes <- ifelse(pred_probs > 0.5, 1, 0)
 
-library(caret)
+
 
 # Confusion matrix and related metrics
-conf_matrix <- confusionMatrix(as.factor(pred_classes), as.factor(incomplete_data_LL$LLW))
+conf_matrix <- confusionMatrix(as.factor(pred_classes), as.factor(complete_data_LL_validation$LLW))
 conf_matrix
 
 ```
@@ -1531,21 +1618,16 @@ conf_matrix
 ## PR
 
 ```{r}
-# Step 1: Predict probabilities
-pred_probs <- predict(step_8_PR, newdata = incomplete_data_PR, type = "response")
 
-# Step 2: Create predicted classes from probabilities (convert to 0/1)
+pred_probs <- predict(step_8_PR, newdata = complete_data_PR_validation, type = "response")
 pred_classes <- ifelse(pred_probs > 0.5, "1", "0")
 
-# Step 3: Ensure pred_classes and actual labels (PRW) are both factors with the same levels
 pred_classes <- factor(pred_classes, levels = c("0", "1"))
-incomplete_data_PR$PRW <- factor(incomplete_data_PR$PRW, levels = c("0", "1"))
+complete_data_PR_validation$PRW <- factor(complete_data_PR_validation$PRW, levels = c("0", "1"))
 
-# Step 4: Compute the confusion matrix
-conf_matrix <- confusionMatrix(pred_classes, incomplete_data_PR$PRW)
 
-# Step 5: Print confusion matrix
-print(conf_matrix)
+confusionMatrix(pred_classes, complete_data_PR_validation$PRW)
+
 
 
 
@@ -1556,13 +1638,10 @@ print(conf_matrix)
 
 
 ```{r}
-# Get the odds ratios and confidence intervals
-library(broom)
-
 
 model_summary <- tidy(step_6, conf.int = TRUE, exp = TRUE)
 
-# Create the forest plot
+
 a <- ggplot(model_summary, aes(y = term, x = estimate, xmin = conf.low, xmax = conf.high)) +
   geom_pointrange() +
   geom_vline(xintercept = 1, linetype = "dashed", color = "darkblue") +
@@ -1578,7 +1657,7 @@ ggsave("LLforestplot.tiff", plot = a, device = "tiff", width = 8, height = 6, dp
 
 model_summary_2 <- tidy(step_8_PR, conf.int = TRUE, exp = TRUE)
 
-# Create the forest plot
+
 b <- ggplot(model_summary_2, aes(y = term, x = estimate, xmin = conf.low, xmax = conf.high)) +
   geom_pointrange() +
   geom_vline(xintercept = 1, linetype = "dashed", color = "darkblue") +
@@ -1588,6 +1667,34 @@ b <- ggplot(model_summary_2, aes(y = term, x = estimate, xmin = conf.low, xmax =
 
 
 ggsave("PRforestplot.tiff", plot = b, device = "tiff", width = 8, height = 6, dpi = 300)
+
+
+```
+
+
+# emmeans
+
+
+```{r}
+
+
+# LL 
+
+
+emm_level <- emmeans(step_6, ~tourney_level, type = 'response')
+emm_rank <- emmeans(step_6, ~rank_category, type = 'response')
+
+summary(emm_level)
+summary(emm_rank)
+
+# PR
+
+
+emm_age <- emmeans(step_8_PR, ~age_category, type = 'response')
+emm_rank <- emmeans(step_8_PR, ~rank_category, type = 'response')
+
+summary(emm_age)
+summary(emm_rank)
 
 
 ```
